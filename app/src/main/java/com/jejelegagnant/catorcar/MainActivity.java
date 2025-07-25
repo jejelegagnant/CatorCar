@@ -2,6 +2,7 @@ package com.jejelegagnant.catorcar;
 
 import android.media.Image;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -30,11 +31,16 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+import android.content.Intent;
+import android.net.Uri;
+
 
 public class MainActivity extends AppCompatActivity {
     private View mainLayout;
     private TextView textView;
     private ImageView backgroundImage;
+    private static final int REQUEST_IMAGE_PICK = 1;
+    private static final int REQUEST_IMAGE_CAPTURE = 2;
 
 
     @Override
@@ -59,29 +65,74 @@ public class MainActivity extends AppCompatActivity {
 
     private void onAnalyzeButtonClick() {
         Log.d("MainActivity", "Le bouton a été cliqué !");
+        String[] options = {"Choisir dans la galerie", "Prendre une photo"};
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Sélectionner une image")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        // Galerie
+                        Intent pickIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                        startActivityForResult(pickIntent, REQUEST_IMAGE_PICK);
+                    } else {
+                        // Appareil photo
+                        Intent takePictureIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+                        startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
+                    }
+                })
+                .show();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null) {
+            Toast.makeText(this, "Aucune image sélectionnée", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Bitmap bitmap = null;
+
+        if (requestCode == REQUEST_IMAGE_PICK) {
+            try {
+                Uri imageUri = data.getData();
+                bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), imageUri);
+            } catch (IOException e) {
+                Toast.makeText(this, "Erreur lors du chargement de l'image", Toast.LENGTH_SHORT).show();
+                Log.e("Image", "Erreur chargement image", e);
+                return;
+            }
+        } else if (requestCode == REQUEST_IMAGE_CAPTURE) {
+            Bundle extras = data.getExtras();
+            if (extras != null && extras.get("data") instanceof Bitmap) {
+                bitmap = (Bitmap) extras.get("data");
+            } else {
+                Toast.makeText(this, "Erreur lors de la capture", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+
+        if (bitmap != null) {
+            runModel(bitmap); // exécute l’analyse avec le modèle
+        }
+    }
+    private void runModel(Bitmap bitmap) {
         Toast.makeText(MainActivity.this, "Analyse en cours...", Toast.LENGTH_SHORT).show();
 
         int inputSize = 260;
-        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.tabby_cat);
-
         Interpreter tflite = null;
+
         try {
             tflite = new Interpreter(FileUtil.loadMappedFile(this, "2.tflite"));
             List<String> labels = FileUtil.loadLabels(this, "labels.txt");
 
             int[] inputShape = tflite.getInputTensor(0).shape();
             DataType inputType = tflite.getInputTensor(0).dataType();
-            Log.d("Model", "Input shape: " + Arrays.toString(inputShape));
-            Log.d("Model", "Input type: " + inputType.name());
 
             TensorImage tensorImage = preprocessImage(bitmap, inputSize, inputType);
 
             int[] outputShape = tflite.getOutputTensor(0).shape();
             DataType outputType = tflite.getOutputTensor(0).dataType();
             TensorBuffer outputBuffer = TensorBuffer.createFixedSize(outputShape, outputType);
-
-            Log.d("Model", "Output shape: " + Arrays.toString(outputShape));
-            Log.d("Model", "Output type: " + outputType.name());
 
             tflite.run(tensorImage.getBuffer(), outputBuffer.getBuffer());
 
@@ -96,6 +147,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+
 
     private TensorImage preprocessImage(Bitmap bitmap, int inputSize, DataType inputType) {
         TensorImage tensorImage = new TensorImage(inputType);
