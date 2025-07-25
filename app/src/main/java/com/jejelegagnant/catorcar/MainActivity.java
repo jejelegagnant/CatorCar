@@ -34,7 +34,10 @@ import java.util.List;
 import android.content.Intent;
 import android.net.Uri;
 
-
+/**
+ * Main activity for the CatorCar app.
+ * Handles image selection, preprocessing, model inference, and result display.
+ */
 public class MainActivity extends AppCompatActivity {
     private View mainLayout;
     private TextView textView;
@@ -42,7 +45,10 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_IMAGE_PICK = 1;
     private static final int REQUEST_IMAGE_CAPTURE = 2;
 
-
+    /**
+     * Initializes the activity.
+     * @param savedInstanceState The saved instance state.
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,28 +59,32 @@ public class MainActivity extends AppCompatActivity {
         textView = findViewById(R.id.textView);
         backgroundImage = findViewById(R.id.backgroundImage);
 
-
         setupAnalyzeButton();
         setupWindowInsets();
     }
 
+    /**
+     * Sets up the analyze button and its click listener.
+     */
     private void setupAnalyzeButton() {
         Button analyzeButton = findViewById(R.id.button);
         analyzeButton.setOnClickListener(v -> onAnalyzeButtonClick());
     }
 
+    /**
+     * Handles the analyze button click event.
+     * Shows a dialog to choose between gallery and camera.
+     */
     private void onAnalyzeButtonClick() {
-        Log.d("MainActivity", "Le bouton a été cliqué !");
-        String[] options = {"Choisir dans la galerie", "Prendre une photo"};
+        Log.d("MainActivity", "Button clicked!");
+        String[] options = {"Choose from gallery", "Take a photo"};
         new android.app.AlertDialog.Builder(this)
-                .setTitle("Sélectionner une image")
+                .setTitle("Select an image")
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) {
-                        // Galerie
                         Intent pickIntent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
                         startActivityForResult(pickIntent, REQUEST_IMAGE_PICK);
                     } else {
-                        // Appareil photo
                         Intent takePictureIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
                         startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE);
                     }
@@ -82,11 +92,14 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+    /**
+     * Handles the result from image selection or capture.
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode != RESULT_OK || data == null) {
-            Toast.makeText(this, "Aucune image sélectionnée", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "No image selected", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -97,8 +110,8 @@ public class MainActivity extends AppCompatActivity {
                 Uri imageUri = data.getData();
                 bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), imageUri);
             } catch (IOException e) {
-                Toast.makeText(this, "Erreur lors du chargement de l'image", Toast.LENGTH_SHORT).show();
-                Log.e("Image", "Erreur chargement image", e);
+                Toast.makeText(this, "Error loading image", Toast.LENGTH_SHORT).show();
+                Log.e("Image", "Error loading image", e);
                 return;
             }
         } else if (requestCode == REQUEST_IMAGE_CAPTURE) {
@@ -106,17 +119,22 @@ public class MainActivity extends AppCompatActivity {
             if (extras != null && extras.get("data") instanceof Bitmap) {
                 bitmap = (Bitmap) extras.get("data");
             } else {
-                Toast.makeText(this, "Erreur lors de la capture", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Error capturing image", Toast.LENGTH_SHORT).show();
                 return;
             }
         }
 
         if (bitmap != null) {
-            runModel(bitmap); // exécute l’analyse avec le modèle
+            runModel(bitmap);
         }
     }
+
+    /**
+     * Runs the TensorFlow Lite model on the given bitmap.
+     * @param bitmap The input image.
+     */
     private void runModel(Bitmap bitmap) {
-        Toast.makeText(MainActivity.this, "Analyse en cours...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(MainActivity.this, "Analyzing...", Toast.LENGTH_SHORT).show();
 
         int inputSize = 260;
         Interpreter tflite = null;
@@ -139,8 +157,8 @@ public class MainActivity extends AppCompatActivity {
             handlePredictionResult(outputBuffer, labels);
 
         } catch (IOException e) {
-            Toast.makeText(this, "Erreur lors du chargement du modèle", Toast.LENGTH_LONG).show();
-            Log.e("Model", "Erreur chargement modèle", e);
+            Toast.makeText(this, "Error loading model", Toast.LENGTH_LONG).show();
+            Log.e("Model", "Error loading model", e);
         } finally {
             if (tflite != null) {
                 tflite.close();
@@ -148,7 +166,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
+    /**
+     * Preprocesses the input bitmap for the model.
+     * @param bitmap The input image.
+     * @param inputSize The required input size.
+     * @param inputType The required input data type.
+     * @return The preprocessed TensorImage.
+     */
     private TensorImage preprocessImage(Bitmap bitmap, int inputSize, DataType inputType) {
         TensorImage tensorImage = new TensorImage(inputType);
         tensorImage.load(bitmap);
@@ -164,6 +188,11 @@ public class MainActivity extends AppCompatActivity {
         return imageProcessor.process(tensorImage);
     }
 
+    /**
+     * Handles the prediction result and updates the UI accordingly.
+     * @param outputBuffer The model output buffer.
+     * @param labels The list of labels.
+     */
     private void handlePredictionResult(TensorBuffer outputBuffer, List<String> labels) {
         float[] scores = outputBuffer.getFloatArray();
 
@@ -178,31 +207,44 @@ public class MainActivity extends AppCompatActivity {
         Log.d("Prediction", "Top label: " + result + " (score=" + confidence + ")");
         Log.d("Prediction", "All scores: " + Arrays.toString(scores));
 
-        Toast.makeText(this, "Prédit : " + result + "\n(Confiance : " + confidence + ")", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Predicted: " + result + "\n(Confidence: " + confidence + ")", Toast.LENGTH_LONG).show();
         if (isIndexCar(maxIdx)) {
             mainLayout.setBackgroundColor(getResources().getColor(android.R.color.holo_blue_dark));
             backgroundImage.setImageResource(R.drawable.car_background);
-            textView.setText("It is a car!" + "\n" + result);
+            textView.setText("It is a car!\n" + result);
         } else if (isIndexCat(maxIdx)) {
             mainLayout.setBackgroundColor(getResources().getColor(android.R.color.holo_orange_light));
             backgroundImage.setImageResource(R.drawable.cat_background);
-            textView.setText("It is a cat!" + "\n" + result);
+            textView.setText("It is a cat!\n" + result);
         } else {
             mainLayout.setBackgroundColor(getResources().getColor(android.R.color.darker_gray));
             backgroundImage.setImageResource(R.drawable.idk_background);
-            textView.setText("It is neither a cat nor a car."+ "\n" + result);
+            textView.setText("It is neither a cat nor a car.\n" + result);
         }
     }
+
+    /**
+     * Checks if the index corresponds to a cat label.
+     * @param index The label index.
+     * @return True if the index is a cat, false otherwise.
+     */
     private boolean isIndexCat(int index) {
-        // Vérifie si l'index correspond à un label de chat
         return index > 280 && index < 294 || index == 383;
     }
+
+    /**
+     * Checks if the index corresponds to a car label.
+     * @param index The label index.
+     * @return True if the index is a car, false otherwise.
+     */
     private boolean isIndexCar(int index) {
-        // Vérifie si l'index correspond à un label de voiture
         return index == 436 || index == 468 || index == 511 || index == 609 || index == 619 || index == 656
                 || index == 661 || index == 705 || index == 717 || index == 751 || index == 757 || index == 817;
     }
 
+    /**
+     * Sets up window insets for edge-to-edge display.
+     */
     private void setupWindowInsets() {
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
