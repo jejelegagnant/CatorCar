@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">CatorCar</string>
+    <string name="background">Background image</string>
 </resources>

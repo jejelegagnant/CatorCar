@@ -3,7 +3,10 @@ package com.jejelegagnant.catorcar;
 import android.media.Image;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -29,12 +32,21 @@ import java.util.List;
 
 
 public class MainActivity extends AppCompatActivity {
+    private View mainLayout;
+    private TextView textView;
+    private ImageView backgroundImage;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
+
+        mainLayout = findViewById(R.id.main);
+        textView = findViewById(R.id.textView);
+        backgroundImage = findViewById(R.id.backgroundImage);
+
 
         setupAnalyzeButton();
         setupWindowInsets();
@@ -50,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(MainActivity.this, "Analyse en cours...", Toast.LENGTH_SHORT).show();
 
         int inputSize = 260;
-        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.sport_car);
+        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.tabby_cat);
 
         Interpreter tflite = null;
         try {
@@ -115,6 +127,28 @@ public class MainActivity extends AppCompatActivity {
         Log.d("Prediction", "All scores: " + Arrays.toString(scores));
 
         Toast.makeText(this, "Prédit : " + result + "\n(Confiance : " + confidence + ")", Toast.LENGTH_LONG).show();
+        if (isIndexCar(maxIdx)) {
+            mainLayout.setBackgroundColor(getResources().getColor(android.R.color.holo_blue_dark));
+            backgroundImage.setImageResource(R.drawable.car_background);
+            textView.setText("It is a car!" + "\n" + result);
+        } else if (isIndexCat(maxIdx)) {
+            mainLayout.setBackgroundColor(getResources().getColor(android.R.color.holo_orange_light));
+            backgroundImage.setImageResource(R.drawable.cat_background);
+            textView.setText("It is a cat!" + "\n" + result);
+        } else {
+            mainLayout.setBackgroundColor(getResources().getColor(android.R.color.darker_gray));
+            backgroundImage.setImageResource(R.drawable.idk_background);
+            textView.setText("It is neither a cat nor a car."+ "\n" + result);
+        }
+    }
+    private boolean isIndexCat(int index) {
+        // Vérifie si l'index correspond à un label de chat
+        return index > 280 && index < 294 || index == 383;
+    }
+    private boolean isIndexCar(int index) {
+        // Vérifie si l'index correspond à un label de voiture
+        return index == 436 || index == 468 || index == 511 || index == 609 || index == 619 || index == 656
+                || index == 661 || index == 705 || index == 717 || index == 751 || index == 757 || index == 817;
     }
 
     private void setupWindowInsets() {
